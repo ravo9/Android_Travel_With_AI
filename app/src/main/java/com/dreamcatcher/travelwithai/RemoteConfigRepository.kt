@@ -1,5 +1,6 @@
 package com.dreamcatcher.travelwithai
 
+import android.util.Log
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.ktx.remoteConfig
 import com.google.firebase.remoteconfig.ktx.remoteConfigSettings
@@ -17,11 +18,16 @@ class RemoteConfigRepository {
         remoteConfig.fetchAndActivate()
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    val apiKey = remoteConfig.getString("api_key")
-                    onSuccess(apiKey)
+                    onSuccess(remoteConfig.getString("api_key"))
                 } else {
-                    onError(Throwable()) // Todo
+                    val err = task.exception ?: Throwable("fetchAndActivate failed with no exception")
+                    Log.e(TAG, "Remote Config fetchAndActivate failed", err)
+                    onError(err)
                 }
             }
+    }
+
+    companion object {
+        private const val TAG = "TravelWithAI.RemoteConfig"
     }
 }

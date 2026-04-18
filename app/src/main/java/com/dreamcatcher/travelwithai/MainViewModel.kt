@@ -3,14 +3,17 @@ package com.dreamcatcher.travelwithai
 import android.content.Context
 import android.graphics.Bitmap
 import android.location.Location
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlin.text.replace
 
 class MainViewModel(
@@ -30,8 +33,11 @@ class MainViewModel(
     fun userAgreedLocation() {
         viewModelScope.launch {
             val location = locationRepository.getCurrentLocation()
-            if (location == null) _location.value = "Last location not found."
-            else _location.value = location.toDetailedString()
+            if (location == null) {
+                _location.value = "Last location not found."
+            } else {
+                _location.value = location.toDetailedString()
+            }
         }
     }
 
@@ -75,10 +81,20 @@ class MainViewModel(
                 } else {
                     enhancePrompt(messageType, location as Location, prompt)
                 }
-                val response = generativeModelRepository.generateResponse(enhancedPrompt, photo)
+                val response = try {
+                    withTimeout(GEMINI_CALL_TIMEOUT_MS) {
+                        generativeModelRepository.generateResponse(enhancedPrompt, photo)
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    Log.e(TAG, "Gemini request timed out", e)
+                    _uiState.value =
+                        UiState.Error("Request timed out. Check your network and try again.")
+                    return@launch
+                }
                 if (response != null) _uiState.value = UiState.Success(cleanResponse(response))
                 else _uiState.value = UiState.Error("Error (received prompt is empty).")
             } catch (e: Exception) {
+                Log.e(TAG, "sendPrompt failed", e)
                 _uiState.value = UiState.Error(e.localizedMessage ?: "Sending prompt error.")
             }
         }
@@ -91,6 +107,11 @@ class MainViewModel(
         messageType.getMessage(location, prompt ?: "")
 
     private fun cleanResponse(response: String) = response.replace("**", "")
+
+    companion object {
+        private const val TAG = "TravelWithAI.MainVM"
+        private const val GEMINI_CALL_TIMEOUT_MS = 120_000L
+    }
 
     fun Location.toDetailedString(): String {
         return buildString {
