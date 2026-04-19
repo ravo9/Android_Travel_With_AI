@@ -7,7 +7,7 @@ import com.google.ai.client.generativeai.type.asTextOrNull
 import com.google.ai.client.generativeai.type.content
 
 object ModelNames {
-    const val DEFAULT_GENERATION = "gemini-2.5-flash"
+    const val DEFAULT_GENERATION = "gemini-2.5-flash-lite"
     const val GEMINI_1_5_FLASH = "gemini-1.5-flash"
 }
 
